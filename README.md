@@ -38,8 +38,6 @@ Default universe: HDFCBANK, ICICIBANK, AXISBANK, KOTAKBANK (.NS via yfinance).
 
 Implemented: Engle-Granger, Johansen, walk-forward OOS, cost model, Sharpe/Sortino/Calmar/drawdown/turnover/hit rate, linear + XGBoost spread prediction.
 
-Not done: live execution, multi-asset portfolio optimizer, futures roll, intraday data.
-
 ## License
 
 MIT
@@ -69,7 +67,7 @@ pip install -r requirements.txt
 python scripts/run_banking_pairs.py --start 2019-01-01 --leg-y HDFCBANK --leg-x ICICIBANK
 ```
 
-3. Run ML experiments independently (example):
+3. Run ML experiments independently:
 
 ```py
 from sar.data.loader import DataLoader
@@ -86,4 +84,4 @@ res = ml.fit(spread, method='linear')
 print('OOS R2:', res.r2_oos)
 ```
 
-If you want, I can add a short notebook showing exploratory plots and intermediate steps.
+
