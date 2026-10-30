@@ -1,67 +1,42 @@
-Walkthrough — running experiments and ML quick-start
-===================================================
+# Research Walkthrough
 
-This short walkthrough shows the commands and minimal code snippets I used to
-run experiments and validate the ML baselines.
+This guide runs the repository's NSE banking-pairs research entry point. It uses daily prices retrieved by yfinance; results can vary with the data vendor, retrieval date, and corporate-action adjustments.
 
-Quick commands
---------------
+## 1. Set up the environment
 
-Create a venv and install requirements:
+Requires Python 3.10 or later.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-Run the main script (example):
+## 2. Run the walk-forward example
+
+From the repository root:
 
 ```bash
-python scripts/run_banking_pairs.py --start 2019-01-01 --leg-y HDFCBANK --leg-x ICICIBANK
+python scripts/run_banking_pairs.py \
+  --start 2019-01-01 \
+  --leg-y HDFCBANK \
+  --leg-x ICICIBANK
 ```
 
-Run only the ML unit tests:
+The script prints candidate cointegrated pairs, then reports out-of-sample Sharpe, Sortino, maximum drawdown, turnover, and hit rate for the selected pair. It also prints linear and XGBoost spread-prediction baseline scores.
+
+## 3. Run the test suite
 
 ```bash
-pytest -q tests/test_ml.py
+pytest -q
 ```
 
-Example: run the predictor interactively
----------------------------------------
+The tests include synthetic-data checks. A passing test suite verifies code behavior on those fixtures; it does not validate a profitable strategy.
 
-Save this snippet as `examples/run_predictor.py` and run it to reproduce a
-single ML baseline run.
+## Reproducibility checklist
 
-```py
-from sar.data.loader import DataLoader
-from sar.features.cointegration import compute_spread, ols_hedge_ratio
-from sar.ml.predictor import SpreadPredictor
+For a research comparison, record the price source, retrieval date, date range, selected pair, train/test window lengths, signal thresholds, cost assumptions, and package versions. Preserve the input data snapshot where licensing permits.
 
-panel = DataLoader().load_banking_universe(start="2019-01-01")
-prices = panel.close
-y, x = prices['HDFCBANK'], prices['ICICIBANK']
-beta = ols_hedge_ratio(y, x)
-spread = compute_spread(y, x, beta)
-ml = SpreadPredictor(lookback=5)
-res = ml.fit(spread, method='linear')
-print('linear OOS R2 =', res.r2_oos)
+## Interpretation
 
-try:
-    res_xgb = ml.fit(spread, method='xgboost')
-    print('xgboost OOS R2 =', res_xgb.r2_oos)
-except Exception as exc:
-    print('xgboost unavailable or failed:', exc)
-```
-
-Commit message examples (used for this project)
------------------------------------------------
-
-I prefer clear, action-oriented commit messages. Examples used for the
-changes in this branch:
-
-- `docs: add author notes describing design and reproducibility steps`
-- `docs: add walkthrough and example script for ML experiments`
-- `feat: annotate SpreadPredictor with design rationale and feature notes`
-
-These messages are short, deterministic, and explain what changed.
+The backtester uses a fixed OLS hedge ratio for each training window and a simplified cost model. The optional ML output is a baseline diagnostic; it is not used to generate the backtest's trades. Read the [README](../README.md) and [architecture notes](architecture.md) before interpreting performance.
