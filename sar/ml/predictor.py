@@ -97,11 +97,8 @@ class SpreadPredictor:
     def fit_linear(self, spread: pd.Series, train_frac: float = 0.7) -> MLPredictionResult:
         """Fit a linear regression baseline and return predictions + OOS R^2."""
         self._validate_run(spread, train_frac)
-        self._validate_run(spread, train_frac)
         X, y = self._build_xy(spread)
         split = int(len(X) * train_frac)
-        if split < 2 or split >= len(X):
-            raise ValueError("train/test split leaves too few observations")
         if split < 2 or split >= len(X):
             raise ValueError("train/test split leaves too few observations")
         X_train, X_test = X.iloc[:split], X.iloc[split:]
