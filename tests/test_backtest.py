@@ -26,3 +26,36 @@ def test_costs_reduce_pnl(cointegrated_prices):
     eq_cheap = cheap.run(y, x, beta).equity.iloc[-1]
     eq_costly = costly.run(y, x, beta).equity.iloc[-1]
     assert eq_costly <= eq_cheap
+
+
+def test_returns_are_scaled_to_notional_and_costs_keep_currency_units():
+    import pandas as pd
+    from sar.signals.zscore import SignalParams
+
+    index = pd.date_range("2025-01-01", periods=6, freq="D")
+    x = pd.Series([100, 101, 99, 102, 100, 98], index=index, dtype=float)
+    spread = pd.Series([0, 0, 2, 0, -3, 0], index=index, dtype=float)
+    y = x + spread
+    result = PairsBacktester(
+        signal_params=SignalParams(entry_z=0.5, exit_z=0.0, lookback=2),
+        notional=10_000,
+    ).run(y, x, hedge_ratio=1.0)
+
+    assert result.returns.abs().max() < 0.1
+    assert result.costs.max() > 0.0
+    assert result.equity.iloc[0] == 1.0
+
+
+def test_backtester_rejects_invalid_notional_and_prices(cointegrated_prices):
+    import numpy as np
+    import pandas as pd
+    import pytest
+
+    with pytest.raises(ValueError, match="notional"):
+        PairsBacktester(notional=0.0)
+    y = cointegrated_prices["LEG_A"].copy()
+    x = cointegrated_prices["LEG_B"].copy()
+    y.iloc[0] = np.nan
+    x.iloc[0] = np.nan
+    with pytest.raises(ValueError, match="aligned"):
+        PairsBacktester().run(y.iloc[:1], x.iloc[:1], 1.0)

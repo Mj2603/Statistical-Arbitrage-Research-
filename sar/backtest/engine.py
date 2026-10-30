@@ -166,7 +166,7 @@ class WalkForwardEngine:
             else:
                 cres = self.coint.engle_granger(train[leg_y], train[leg_x], (leg_y, leg_x))
 
-            if cres.pvalue > self.pvalue_threshold:
+            if not cres.is_significant:
                 continue
 
             hedge = cres.hedge_ratio

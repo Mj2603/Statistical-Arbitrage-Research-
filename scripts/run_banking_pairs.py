@@ -25,7 +25,11 @@ def main():
     pairs = coint.scan_pairs(prices, method="engle_granger")
     print(f"cointegrated pairs: {len(pairs)}")
     for r in pairs[:5]:
-        print(f"  {r.pair} p={r.pvalue:.4f} beta={r.hedge_ratio:.3f}")
+        test_value = (
+            f"p={r.pvalue:.4f}" if r.pvalue is not None else
+            f"trace={r.test_statistic:.3f} > cv={r.critical_value:.3f} at {r.significance_level:.0%}"
+        )
+        print(f"  {r.pair} {test_value} beta={r.hedge_ratio:.3f}")
 
     wf = WalkForwardEngine(train_days=252, test_days=63, step_days=63)
     wf_res = wf.run(prices, args.leg_y, args.leg_x)

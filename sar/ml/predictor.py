@@ -27,16 +27,14 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
 
-@dataclass
+@dataclass(frozen=True)
 class MLPredictionResult:
-    """Simple container for ML prediction outputs.
+    """Out-of-sample model predictions aligned with observed targets."""
 
-    Fields:
-    - model: a short string identifying the model used (e.g., "linear").
-    - r2_oos: out-of-sample R^2 computed on the test partition.
-    - predictions: pd.Series of model predictions (aligned to the test index).
-    - actual: pd.Series of actual target values used for evaluation.
-    """
+    model: str
+    r2_oos: float
+    predictions: pd.Series
+    actual: pd.Series
 
 
 class SpreadPredictor:
@@ -50,8 +48,25 @@ class SpreadPredictor:
     """
 
     def __init__(self, lookback: int = 5, horizon: int = 1):
+        if not isinstance(lookback, int) or lookback < 1:
+            raise ValueError("lookback must be a positive integer")
+        if not isinstance(horizon, int) or horizon < 1:
+            raise ValueError("horizon must be a positive integer")
         self.lookback = lookback
         self.horizon = horizon
+
+    @staticmethod
+    def _validate_run(spread: pd.Series, train_frac: float) -> None:
+        if not isinstance(spread, pd.Series) or not pd.api.types.is_numeric_dtype(spread):
+            raise TypeError("spread must be a numeric pandas Series")
+        if len(spread) < 25:
+            raise ValueError("spread series is too short for rolling features")
+        if not spread.index.is_monotonic_increasing or spread.index.has_duplicates:
+            raise ValueError("spread index must be sorted and unique")
+        if not np.isfinite(spread.to_numpy(dtype=float)).all():
+            raise ValueError("spread must contain only finite values")
+        if not np.isfinite(train_frac) or not 0.0 < train_frac < 1.0:
+            raise ValueError("train_frac must be between 0 and 1")
 
     def _build_features(self, spread: pd.Series) -> pd.DataFrame:
         """Create a small set of interpretable features from the spread.
@@ -81,8 +96,11 @@ class SpreadPredictor:
 
     def fit_linear(self, spread: pd.Series, train_frac: float = 0.7) -> MLPredictionResult:
         """Fit a linear regression baseline and return predictions + OOS R^2."""
+        self._validate_run(spread, train_frac)
         X, y = self._build_xy(spread)
         split = int(len(X) * train_frac)
+        if split < 2 or split >= len(X):
+            raise ValueError("train/test split leaves too few observations")
         X_train, X_test = X.iloc[:split], X.iloc[split:]
         y_train, y_test = y.iloc[:split], y.iloc[split:]
 
@@ -100,8 +118,11 @@ class SpreadPredictor:
         """
         import xgboost as xgb
 
+        self._validate_run(spread, train_frac)
         X, y = self._build_xy(spread)
         split = int(len(X) * train_frac)
+        if split < 2 or split >= len(X):
+            raise ValueError("train/test split leaves too few observations")
         X_train, X_test = X.iloc[:split], X.iloc[split:]
         y_train, y_test = y.iloc[:split], y.iloc[split:]
 
@@ -126,4 +147,6 @@ class SpreadPredictor:
     ) -> MLPredictionResult:
         if method == "xgboost":
             return self.fit_xgboost(spread, train_frac)
-        return self.fit_linear(spread, train_frac)
+        if method == "linear":
+            return self.fit_linear(spread, train_frac)
+        raise ValueError("method must be 'linear' or 'xgboost'")
