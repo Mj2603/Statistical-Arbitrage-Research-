@@ -1,35 +1,45 @@
-# Notes
+# Research Architecture
 
-Research pipeline for pairs stat-arb. Not a live strategy.
+This repository is a reproducible research prototype for cointegration-based pairs strategies on daily NSE equity data. It separates data loading, pair diagnostics, signal generation, backtesting, and evaluation so that each stage can be inspected independently.
 
+## Research flow
+
+```text
+Daily price panel
+    ├── Pair diagnostics (Engle–Granger or Johansen)
+    └── Walk-forward evaluation
+          ├── Fit cointegration and a fixed OLS hedge ratio on training data
+          ├── Generate z-score signals for the selected pair
+          ├── Apply the configured transaction-cost approximation
+          └── Report out-of-sample returns and performance metrics
 ```
-DataLoader -> CointegrationEngine -> SignalGenerator -> PairsBacktester
-                                              |
-                                    WalkForwardEngine (train/test/roll)
-                                              |
-                              PerformanceAttribution + RiskAttribution
-                                              |
-                                    SpreadPredictor (linear / xgboost)
-```
+
+The optional linear and XGBoost experiments predict spread changes. They are research baselines and are not connected to the backtest's trading decisions.
 
 ## Modules
 
-- `sar/data` — NSE price loading via yfinance or CSV
-- `sar/features` — Engle-Granger, Johansen, hedge ratio, spread
-- `sar/signals` — z = (spread - mu) / sigma, entry +/-2, exit 0
-- `sar/backtest` — pairs PnL, transaction costs, walk-forward
-- `sar/metrics` — Sharpe, Sortino, Calmar, drawdown, turnover, hit rate
-- `sar/risk` — rolling factor beta
-- `sar/ml` — spread change prediction
+| Path | Responsibility |
+|---|---|
+| `sar/data/` | Load daily prices from yfinance or CSV |
+| `sar/features/` | Engle–Granger/Johansen diagnostics, OLS hedge ratios, and spread construction |
+| `sar/signals/` | Z-score entry and exit rules |
+| `sar/backtest/` | Pair backtest, costs, and rolling train/test evaluation |
+| `sar/metrics/` | Sharpe, Sortino, Calmar, drawdown, turnover, and hit rate |
+| `sar/risk/` | Rolling factor-beta analysis |
+| `sar/ml/` | Optional linear and XGBoost spread-change prediction |
 
-## Walk-forward
+## Walk-forward and return conventions
 
-Each window: estimate cointegration on train, trade only OOS segment with frozen hedge ratio from train. Windows roll forward by `step_days`.
+Each walk-forward window estimates the pair relationship on its training interval and trades only the following out-of-sample interval with the training-window OLS hedge ratio held fixed. The implementation does not currently use a Kalman filter or re-estimate Johansen hedge ratios continuously.
 
-## Costs
+Net returns are expressed as decimal fractions of the configured gross pair notional. Spread-price changes are converted using the prior observation's gross pair value. Costs are stored in currency units and deducted after normalization by notional. This is a simplified constant-notional approximation, not a broker-grade two-leg fill, financing, or borrow model.
 
-Per-leg: brokerage + half-spread + slippage in bps. Applied on position changes.
+## Scope and limitations
 
-## Scope
+- The example universe is a small set of NSE banking equities; the backtest evaluates a selected pair.
+- Prices retrieved through yfinance depend on the vendor, retrieval date, and adjustment policy.
+- The cost model does not include borrow, funding, taxes, market impact, or corporate actions.
+- Pair selection across many candidates creates multiple-testing risk.
+- Walk-forward evaluation reduces temporal leakage but does not remove selection bias or establish profitability.
 
-NSE banking universe hardcoded (HDFCBANK, ICICIBANK, AXISBANK, KOTAKBANK). Single pair backtest. ML is feature-based spread delta prediction, not integrated into execution.
+See the [README](../README.md) for installation, the runnable command, and the full research limitations.
