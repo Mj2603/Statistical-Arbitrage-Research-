@@ -33,8 +33,9 @@ def test_returns_are_scaled_to_notional_and_costs_keep_currency_units():
     from sar.signals.zscore import SignalParams
 
     index = pd.date_range("2025-01-01", periods=6, freq="D")
-    y = pd.Series([100, 100, 102, 100, 97, 100], index=index, dtype=float)
-    x = pd.Series([100, 100, 100, 100, 100, 100], index=index, dtype=float)
+    x = pd.Series([100, 101, 99, 102, 100, 98], index=index, dtype=float)
+    spread = pd.Series([0, 0, 2, 0, -3, 0], index=index, dtype=float)
+    y = x + spread
     result = PairsBacktester(
         signal_params=SignalParams(entry_z=0.5, exit_z=0.0, lookback=2),
         notional=10_000,
