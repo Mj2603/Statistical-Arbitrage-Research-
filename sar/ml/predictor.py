@@ -118,8 +118,11 @@ class SpreadPredictor:
         """
         import xgboost as xgb
 
+        self._validate_run(spread, train_frac)
         X, y = self._build_xy(spread)
         split = int(len(X) * train_frac)
+        if split < 2 or split >= len(X):
+            raise ValueError("train/test split leaves too few observations")
         X_train, X_test = X.iloc[:split], X.iloc[split:]
         y_train, y_test = y.iloc[:split], y.iloc[split:]
 
