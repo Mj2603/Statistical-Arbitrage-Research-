@@ -13,7 +13,7 @@ The implementation is intended for reproducible research and education. It is no
 - Performance summaries for return, risk, drawdown, turnover, and hit rate.
 - Optional spread-prediction experiments.
 
-The current walk-forward implementation uses one fixed OLS hedge ratio per training window. It does **not** currently implement a Kalman filter or rolling Johansen hedge-ratio updates. Johansen screening reports a coarse 5% critical-value decision as a proxy rather than a calibrated p-value. Treat its output accordingly.
+The current walk-forward implementation uses one fixed OLS hedge ratio per training window. It does **not** currently implement a Kalman filter or rolling Johansen hedge-ratio updates. Johansen screening reports the trace statistic, the selected 10%/5%/1% critical value, and a threshold decision. It does not invent or report a p-value for Johansen.
 
 ## Setup
 
