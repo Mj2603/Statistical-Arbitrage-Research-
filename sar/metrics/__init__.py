@@ -1,6 +1,7 @@
 from sar.metrics.performance import (
     PerformanceAttribution,
     PerformanceReport,
+    cagr,
     calmar_ratio,
     hit_rate,
     max_drawdown,
@@ -12,6 +13,7 @@ from sar.metrics.performance import (
 __all__ = [
     "PerformanceAttribution",
     "PerformanceReport",
+    "cagr",
     "calmar_ratio",
     "hit_rate",
     "max_drawdown",

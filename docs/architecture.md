@@ -30,7 +30,7 @@ The optional linear and XGBoost experiments predict spread changes. They are res
 
 ## Walk-forward and return conventions
 
-Each walk-forward window estimates the pair relationship on its training interval and trades only the following out-of-sample interval with the training-window OLS hedge ratio held fixed. The implementation does not currently use a Kalman filter or re-estimate Johansen hedge ratios continuously.
+Each walk-forward window estimates the pair relationship on its training interval, and, in `run_universe`, selects the pair there too. It trades only the following out-of-sample interval, holding the training-window OLS hedge ratio fixed. The z-score uses trailing data that extends back into the training interval, so it does not reset at window boundaries. Positions are closed at the end of each test interval. Windows where no pair passes the test contribute flat 0% days. The implementation does not currently use a Kalman filter or re-estimate Johansen hedge ratios continuously.
 
 Net returns are expressed as decimal fractions of the configured gross pair notional. Spread-price changes are converted using the prior observation's gross pair value. Costs are stored in currency units and deducted after normalization by notional. This is a simplified constant-notional approximation, not a broker-grade two-leg fill, financing, or borrow model.
 

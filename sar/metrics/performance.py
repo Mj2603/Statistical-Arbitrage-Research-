@@ -15,6 +15,10 @@ class PerformanceReport:
     hit_rate: float
     total_return: float
     ann_vol: float
+    cagr: float = 0.0
+    # Fraction of days with a non-zero position.
+    exposure: float = 0.0
+    n_days: int = 0
 
 
 def max_drawdown(equity: pd.Series) -> float:
@@ -45,7 +49,22 @@ def calmar_ratio(returns: pd.Series, equity: pd.Series, periods: int = 252) -> f
 
 
 def turnover(positions: pd.Series) -> float:
-    return float(positions.diff().abs().sum() / max(len(positions), 1))
+    """Average absolute position change per day.
+
+    The first observation counts as a change from flat, so an entry on day one
+    is not missed. Multiply by 252 for annual turnover.
+    """
+    if len(positions) == 0:
+        return 0.0
+    changes = positions.diff().abs().fillna(positions.abs())
+    return float(changes.sum() / len(positions))
+
+
+def cagr(equity: pd.Series, periods: int = 252) -> float:
+    if len(equity) == 0 or equity.iloc[-1] <= 0:
+        return 0.0
+    years = len(equity) / periods
+    return float(equity.iloc[-1] ** (1.0 / years) - 1.0)
 
 
 def hit_rate(returns: pd.Series) -> float:
@@ -61,16 +80,27 @@ class PerformanceAttribution:
 
     def compute(self, returns: pd.Series, positions: Optional[pd.Series] = None) -> PerformanceReport:
         equity = (1 + returns.fillna(0)).cumprod()
-        pos = positions if positions is not None else pd.Series(0, index=returns.index)
+        if positions is None:
+            # Turnover cannot be computed without positions; report NaN rather
+            # than a misleading 0.0.
+            turnover_value = float("nan")
+            exposure = float("nan")
+        else:
+            pos = positions.reindex(returns.index).fillna(0.0)
+            turnover_value = turnover(pos)
+            exposure = float((pos != 0).mean()) if len(pos) else 0.0
         return PerformanceReport(
             sharpe=sharpe_ratio(returns, self.periods),
             sortino=sortino_ratio(returns, self.periods),
             calmar=calmar_ratio(returns, equity, self.periods),
             max_drawdown=max_drawdown(equity),
-            turnover=turnover(pos),
+            turnover=turnover_value,
             hit_rate=hit_rate(returns),
             total_return=float(equity.iloc[-1] - 1) if len(equity) else 0.0,
-            ann_vol=float(returns.std() * np.sqrt(self.periods)),
+            ann_vol=float(returns.std() * np.sqrt(self.periods)) if len(returns) > 1 else 0.0,
+            cagr=cagr(equity, self.periods),
+            exposure=exposure,
+            n_days=int(len(returns)),
         )
 
     def regime_breakdown(

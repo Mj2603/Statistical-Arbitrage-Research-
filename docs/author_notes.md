@@ -34,7 +34,7 @@ on interpretability rather than raw predictive power.
 Reproducibility notes
 ---------------------
 
-1. Create a virtual environment and install dependencies from `requirements.txt`.
+1. Create a virtual environment and run `python -m pip install -e ".[dev]"`.
 
 2. Run the main research script (example):
 

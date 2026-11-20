@@ -4,8 +4,62 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.linalg import eigh
+from statsmodels.tsa.coint_tables import c_sjt
 from statsmodels.tsa.stattools import coint
-from statsmodels.tsa.vector_ar.vecm import coint_johansen
+
+
+@dataclass
+class JohansenTrace:
+    eigenvalues: np.ndarray
+    eigenvectors: np.ndarray
+    trace_stats: np.ndarray
+    critical_values: np.ndarray
+
+
+def johansen_trace(values: np.ndarray, k_ar_diff: int = 1) -> JohansenTrace:
+    """Johansen trace test with a constant (det_order=0).
+
+    Follows the same residual construction as statsmodels' ``coint_johansen``
+    but solves the reduced-rank problem as a *symmetric generalised*
+    eigenproblem ``S_k0 S_00^-1 S_0k v = lambda S_kk v`` via ``scipy.linalg.eigh``.
+    Eigenvalues are therefore real by construction, which avoids the
+    ``ComplexWarning`` that ``np.linalg.eig`` on a non-symmetric product can
+    raise inside statsmodels. Critical values come from statsmodels' tables.
+    """
+    x = np.asarray(values, dtype=float)
+    nobs, neqs = x.shape
+    if nobs <= k_ar_diff + 2:
+        raise ValueError("too few observations for the Johansen test")
+
+    def demean(a: np.ndarray) -> np.ndarray:
+        return a - a.mean(axis=0)
+
+    def resid(a: np.ndarray, z: np.ndarray) -> np.ndarray:
+        if z.size == 0:
+            return a
+        return a - z @ (np.linalg.pinv(z) @ a)
+
+    x = demean(x)
+    dx = np.diff(x, axis=0)
+    lags = [dx[k_ar_diff - j - 1 : len(dx) - j - 1] for j in range(k_ar_diff)]
+    z = demean(np.hstack(lags)) if lags else np.empty((len(dx) - k_ar_diff, 0))
+    r0 = resid(demean(dx[k_ar_diff:]), z)
+    rk = resid(demean(x[1 : nobs - k_ar_diff]), z)
+    t = rk.shape[0]
+    skk = rk.T @ rk / t
+    sk0 = rk.T @ r0 / t
+    s00 = r0.T @ r0 / t
+    sig = sk0 @ np.linalg.solve(s00, sk0.T)
+    sig = 0.5 * (sig + sig.T)
+    eigval, eigvec = eigh(sig, skk)
+    order = np.argsort(eigval)[::-1]
+    eigval = np.clip(eigval[order], 0.0, 1.0 - 1e-12)
+    eigvec = eigvec[:, order]
+    log_terms = np.log1p(-eigval)
+    trace = np.array([-t * log_terms[i:].sum() for i in range(neqs)])
+    crit = np.array([c_sjt(neqs - i, 0) for i in range(neqs)], dtype=float)
+    return JohansenTrace(eigval, eigvec, trace, crit)
 
 
 @dataclass
@@ -94,15 +148,15 @@ class CointegrationEngine:
         if len(sub) < 3 or not np.isfinite(values).all():
             raise ValueError("Johansen test requires at least three finite aligned observations")
 
-        result = coint_johansen(sub, det_order=0, k_ar_diff=1)
-        eigenvector = result.evec[:, 0]
+        result = johansen_trace(values, k_ar_diff=1)
+        eigenvector = result.eigenvectors[:, 0]
         if not np.isfinite(eigenvector).all() or abs(eigenvector[0]) <= np.finfo(float).eps:
             raise ValueError("Johansen eigenvector cannot produce a finite hedge ratio")
         hedge = -eigenvector[1] / eigenvector[0]
 
         critical_column = {0.10: 0, 0.05: 1, 0.01: 2}[significance_level]
-        statistic = float(result.lr1[0])
-        critical_value = float(result.cvt[0, critical_column])
+        statistic = float(result.trace_stats[0])
+        critical_value = float(result.critical_values[0, critical_column])
         if not np.isfinite(statistic) or not np.isfinite(critical_value):
             raise ValueError("Johansen test returned a non-finite statistic")
 

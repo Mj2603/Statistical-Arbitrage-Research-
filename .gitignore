@@ -10,3 +10,4 @@ build/
 data/cache/
 *.csv
 !tests/fixtures/*.csv
+!results/*.csv
